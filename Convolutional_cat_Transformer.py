@@ -161,7 +161,7 @@ class ViTResNet(nn.Module):
         self.layer3 = self._make_layer(block, 64, num_blocks[2], stride=2) #8x8 feature maps (64 in total)
         self.apply(_weights_init)
 
-        BATCH_SIZE_TRAIN = 75
+        BATCH_SIZE_TRAIN = 80
         # Tokenization
         self.token_wA = nn.Parameter(torch.empty(BATCH_SIZE_TRAIN,self.L, 64),requires_grad = True) #Tokenization parameters
         torch.nn.init.xavier_uniform_(self.token_wA)
@@ -180,7 +180,7 @@ class ViTResNet(nn.Module):
         self.transformer = Transformer(dim, depth, heads, mlp_dim, dropout)
 
         self.to_cls_token = nn.Identity()
-        self.FC    = nn.Linear(1152, 27+1)
+        self.FC    = nn.Linear(1152, 2707)
         self.nn1 = nn.Linear(dim, num_classes)  # if finetuning, just use a linear layer without further hidden layers (paper)
         torch.nn.init.xavier_uniform_(self.nn1.weight)
         torch.nn.init.normal_(self.nn1.bias, std = 1e-6)
@@ -198,6 +198,7 @@ class ViTResNet(nn.Module):
 
 
     def forward(self, img, mask = None):
+        # print(img.shape)
         x = F.relu(self.bn1(self.conv1(img)))
         x = self.layer1(x)
         x = self.layer2(x)
@@ -207,6 +208,8 @@ class ViTResNet(nn.Module):
 
         #Tokenization
         wa = rearrange(self.token_wA, 'b h w -> b w h') #Transpose
+        # print(wa.shape)
+        # print(x.shape)
         A= torch.einsum('bij,bjk->bik', x, wa)
         A = rearrange(A, 'b h w -> b w h') #Transpose
         A = A.softmax(dim=-1)
@@ -220,8 +223,8 @@ class ViTResNet(nn.Module):
         x += self.pos_embedding
         x = self.dropout(x)
         x = self.transformer(x, mask) #main game
-        # print(x.shape)
-        x = x.view(75, 1, 1152)
+        print(x.shape)
+        x = x.view(80, 1, 1152)
         x = self.FC(x)
         x = x.permute(1, 0, 2).contiguous()
         return x
